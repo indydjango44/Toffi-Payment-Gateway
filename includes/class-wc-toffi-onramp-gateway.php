@@ -1,9 +1,9 @@
 <?php
 /**
- * WC_Toffi_Source_Gateway class
+ * WC_Toffi_Onramp_Gateway class
  *
  * @author   Kagami
- * @package  WooCommerce Toffi Gatway
+ * @package  WooCommerce Toffi Onramp Gatway
  * @since    1.0.0
  */
 
@@ -11,7 +11,7 @@
 if (!defined('ABSPATH')) {
 	exit;
 }
-class WC_Toffi_Source_Gateway extends WC_Payment_Gateway
+class WC_toffi_onramp_gateway extends WC_Payment_Gateway
 {
 	public function __construct()
 	{
@@ -22,29 +22,24 @@ class WC_Toffi_Source_Gateway extends WC_Payment_Gateway
 		$this->title = $this->get_option('title');
 		$this->description = $this->get_option('description');
 
-		//proxy settings
-		$this->enableproxy = $this->get_option('enableproxy');
-		$this->proxyhost = $this->get_option('proxyhost');
-		$this->proxyport = $this->get_option('proxyport');
-		$this->proxyusername = $this->get_option('proxyusername');
-		$this->proxypassword = $this->get_option('proxypassword');
 		add_action('woocommerce_update_options_payment_gateways_' . $this->id, array($this, 'process_admin_options'));
 	}
 
-	protected function setup_properties()
-	{
-		$this->id = 'toffi-source';
+	protected function setup_properties() {
+		$this->id = 'toffi-onramp-source';
 
-		$image_path = plugin_dir_path(__FILE__) . 'assets/toffi_icon.png';
+		$image_path = plugin_dir_path(__FILE__) . 'assets/toffi_icon_onramp.png';
 
-		$image_url = toffi_upload_image_to_media_library($image_path, 'toffi_icon.png');
+		// Upload the image to the Media Library and get the URL
+		$image_url = toffi_onramp_upload_image_to_media_library($image_path, 'toffi_icon_onramp.png');
 
 		if ($image_url) {
+			// Use the image URL for the icon
 			$this->icon = $image_url;
 		}
-		$this->has_fields = false;
-		$this->method_title = 'Toffi Source Gateway';
-		$this->method_description = 'Toffi Source Gateway for handling redirected payments with Credit Cards and more.';
+		$this->has_fields         = false;
+		$this->method_title = 'Toffi Onramp Payment Gateway';
+		$this->method_description = 'Payment Gateway for processing payments through Crypto Onramps and more';
 		$this->enabled = 'yes';
 
 		$this->supports = array(
@@ -57,41 +52,25 @@ class WC_Toffi_Source_Gateway extends WC_Payment_Gateway
 
 		$this->form_fields = array(
 			'enabled' => array(
-				'title' => __('Enable/Disable', 'toffi-source'),
+				'title' => __('Enable/Disable', 'toffi-onramp-source'),
 				'type' => 'checkbox',
-				'label' => __('Enable Toffi Payment Gateway', 'toffi-source'),
+				'label' => __('Enable Toffi Payment Gateway', 'toffi-onramp-source'),
 				'default' => 'yes'
 			),
 			'title' => array(
-				'title' => __('Title', 'toffi-source'),
+				'title' => __('Title', 'toffi-onramp-source'),
 				'type' => 'safe_text',
-				'description' => __('This controls the title which the user sees during checkout.', 'toffi-source'),
-				'default' => _x('+5% fees Credit Cards - Apple / Google Pay /  PayPal', '+5% fees Credit Cards - Apple / Google Pay /  PayPal', 'toffi-source'),
+				'description' => __('This controls the title which the user sees during checkout.', 'toffi-onramp-source'),
+				'default' => _x('Credit Cards through Toffi Crypto Onramps', 'Credit Cards through Toffi Crypto Onramps', 'toffi-onramp-source'),
 				'desc_tip' => true,
 			),
 			'description' => array(
-				'title' => __('Description', 'toffi-source'),
+				'title' => __('Description', 'toffi-onramp-source'),
 				'type' => 'textarea',
-				'description' => __('Payment method description which the user sees during checkout.', 'toffi-source'),
-				'default' => __('You will be redirected to a payment page for payment.', 'toffi-source'),
+				'description' => __('Payment method description which the user sees during checkout.', 'toffi-onramp-source'),
+				'default' => __('You will be redirected to a payment page where you will choose a Crypto Onramp to pay through.', 'toffi-onramp-source'),
 				'desc_tip' => true,
-			),
-			'capture_external_orders' => array(
-                'title'       => __('Capture non-Toffi orders', 'toffi-source'),
-                'type'        => 'checkbox',
-                'label'       => __('Send non-Toffi orders to Toffi', 'toffi-source'),
-                'default'     => 'yes',
-                'desc_tip'    => true,
-                'description' => __('When enabled, any order not paid with a Toffi gateway will be sent to the Toffi API to create a record.', 'toffi-source'),
-            ),
-            'send_status_updates' => array(
-                'title'       => __('Send order status updates', 'toffi-source'),
-                'type'        => 'checkbox',
-                'label'       => __('Notify Toffi when order status changes', 'toffi-source'),
-                'default'     => 'yes',
-                'desc_tip'    => true,
-                'description' => __('When enabled, any order status change (for Toffi gateway) will be sent to the Toffi API to update the record.', 'toffi-source'),
-            ),
+			)
 		);
 	}
 
@@ -120,21 +99,9 @@ class WC_Toffi_Source_Gateway extends WC_Payment_Gateway
 			echo wpautop(wptexturize($this->instructions));
 		}
 	}
-
-	public function is_available() {
-    if ('yes' !== $this->enabled) {
-        return false;
-    }
-    return parent::is_available();
 }
 
-public function supports($feature) {
-    $supported_features = array('products');
-    return in_array($feature, $supported_features, true);
-}
-}
-
-function toffi_check_image_in_media_library($image_name)
+function toffi_onramp_check_image_in_media_library($image_name)
 {
 	// Query the media library to check if the image exists
 	$query = new WP_Query(array(
@@ -157,10 +124,10 @@ function toffi_check_image_in_media_library($image_name)
 	return false;
 }
 
-function toffi_upload_image_to_media_library($image_path, $image_name)
+function toffi_onramp_upload_image_to_media_library($image_path, $image_name)
 {
 	// First, check if the image already exists in the media library
-	$existing_image_url = toffi_check_image_in_media_library($image_name);
+	$existing_image_url = toffi_onramp_check_image_in_media_library($image_name);
 
 	if ($existing_image_url) {
 		// Return the existing image URL if it's already in the media library

@@ -1,52 +1,51 @@
 <?php
-require_once plugin_dir_path(__FILE__) . 'custom-endpoint-onramp.php';
-class Toffi_custom_endpoint
+class Toffi_onramp_custom_endpoint
 {
     function __construct()
     {
-        add_action('rest_api_init', array($this, 'register_routes'));
+        add_action('rest_api_init', array($this, 'register_onramp_routes'));
     }
-    function register_routes()
+    function register_onramp_routes()
     {
         register_rest_route(
-            'toffi/v1',
+            'toffi_onramp/v1',
             '/update_order_status',
             array(
                 'methods' => 'POST',
-                'callback' => array($this, 'update_order_status'),
-                'permission_callback' => array($this, 'permissions_check'),
+                'callback' => array($this, 'update_onramp_order_status'),
+                'permission_onramp_callback' => array($this, 'permissions_onramp_check'),
             )
         );
         register_rest_route(
-            'toffi/v1',
+            'toffi_onramp/v1',
             '/get_status',
             array(
                 'methods' => 'GET',
-                'callback' => array($this, 'get_gateway_status'),
-                'permission_callback' => array($this, 'permissions_check'),
+                'callback' => array($this, 'get_onramp_gateway_status'),
+                'permission_onramp_callback' => array($this, 'permissions_onramp_check'),
             )
         );
         register_rest_route(
-            'toffi/v1',
+            'toffi_onramp/v1',
             '/enable',
             array(
                 'methods' => 'GET',
-                'callback' => array($this, 'enable_gateway'),
-                'permission_callback' => array($this, 'permissions_check'),
+                'callback' => array($this, 'enable_onramp_gateway'),
+                'permission_callback' => array($this, 'permissions_onramp_check'),
             )
         );
         register_rest_route(
-            'toffi/v1',
+            'toffi_onramp/v1',
             '/disable',
             array(
                 'methods' => 'GET',
-                'callback' => array($this, 'disable_gateway'),
-                'permission_callback' => array($this, 'permissions_check'),
+                'callback' => array($this, 'disable_onramp_gateway'),
+                'permission_callback' => array($this, 'permissions_onramp_check'),
             )
         );
     }
 
-    function permissions_check($request)
+    function permissions_onramp_check($request)
     {
         $provided = $request->get_header('x-website-key');
         if (empty($provided) && isset($_SERVER['HTTP_X_WEBSITE_KEY'])) {
@@ -65,11 +64,9 @@ class Toffi_custom_endpoint
         if (!empty($provided) && hash_equals($expected, $provided)) {
             return true;
         }
-
-        return new WP_Error('rest_forbidden', 'You are not authorized.', array('status' => 401));
     }
 
-    function update_order_status(WP_REST_Request $request)
+    function update_onramp_order_status(WP_REST_Request $request)
     {
         $data = $request->get_json_params();
         $order_id = $data['order_id'];
@@ -85,7 +82,7 @@ class Toffi_custom_endpoint
                 $order_status = "processing";
             }
 
-            if ($order && ($order->get_payment_method() === 'toffi-source' || $forced == true)) {
+            if ($order && ($order->get_payment_method() === 'toffi-onramp-source' || $forced == true)) {
                 $order->update_status($order_status, 'Order status updated via API.');
                 $order->save();
 
@@ -104,9 +101,9 @@ class Toffi_custom_endpoint
         }
     }
 
-    function get_gateway_status()
+    function get_onramp_gateway_status()
     {
-        $settings = get_option('woocommerce_toffi-source_settings');
+        $settings = get_option('woocommerce_toffi-onramp-source_settings');
         $status = $settings['enabled'];
         if ($status === 'yes') {
             return new WP_REST_Response($status, 200);
@@ -115,59 +112,41 @@ class Toffi_custom_endpoint
         }
     }
 
-    function enable_gateway()
+    function enable_onramp_gateway()
     {
-        $settings = get_option('woocommerce_toffi-source_settings');
+        $settings = get_option('woocommerce_toffi-onramp-source_settings');
         $settings['enabled'] = 'yes';
-        update_option('woocommerce_toffi-source_settings', $settings);
+        update_option('woocommerce_toffi-onramp-source_settings', $settings);
         $_POST['enabled'] = 'yes';
         $gateway = new WC_Toffi_Gateway();
         $gateway->process_admin_options();
-        do_action('woocommerce_update_options_payment_gateways_toffi-source');
+        do_action('woocommerce_update_options_payment_gateways_toffi-onramp-source');
         return new WP_REST_Response('ENABLED', 200);
     }
 
-    function disable_gateway()
+    function disable_onramp_gateway()
     {
-        $settings = get_option('woocommerce_toffi-source_settings');
+        $settings = get_option('woocommerce_toffi-onramp-source_settings');
         $settings['enabled'] = 'no';
-        update_option('woocommerce_toffi-source_settings', $settings);
+        update_option('woocommerce_toffi-onramp-source_settings', $settings);
         $_POST['enabled'] = 'no';
         $gateway = new WC_Toffi_Gateway();
         $gateway->process_admin_options();
-        do_action('woocommerce_update_options_payment_gateways_toffi-source');
+        do_action('woocommerce_update_options_payment_gateways_toffi-onramp-source');
         return new WP_REST_Response('DISABLED', 200);
     }
 }
 
-function get_website_domain()
+function get_onramp_website_domain()
 {
     $site_url = get_site_url();
     $domain = parse_url($site_url, PHP_URL_HOST);
     return $domain;
 }
 
-add_filter('woocommerce_thankyou_order_received_text', 'modify_thank_you_text_for_specific_payment_method', 20, 2);
 
-function modify_thank_you_text_for_specific_payment_method($text, $order)
-{
-    if (!$order instanceof WC_Order) {
-        return $text;
-    }
-
-    // Check if the payment method is 'toffi-source'
-    if ('toffi-source' === $order->get_payment_method()) {
-        $new_text = 'Thank you. Your order has been received. Check your email to finish payment.';
-        return $new_text;
-    }
-
-    return $text;
-}
-
-
-
-add_action('template_redirect', 'toffi_redirect');
-function toffi_redirect()
+add_action('template_redirect', 'toffi_onramp_redirect');
+function toffi_onramp_redirect()
 {
     if (is_wc_endpoint_url('order-received') && !isset($_GET['order_id']) && !isset($_GET['stop'])) {
         $stop = $_GET['stop'];
@@ -179,13 +158,13 @@ function toffi_redirect()
         $order = wc_get_order($order_id);
         $payment_title = $order->get_payment_method();
 
-        $domain = get_website_domain();
+        $domain = get_onramp_website_domain();
 
         if (!$order) {
             return;
         }
 
-        $ip = get_customer_ip_address();
+        $ip = get_onramp_customer_ip_address();
 
         if ($ip) {
             $order->update_meta_data('_customer_ip_address', $ip);
@@ -241,16 +220,16 @@ function toffi_redirect()
         );
 
 
-        if ($payment_title == 'toffi-source') {
+        if ($payment_title == 'toffi-onramp-source') {
 
             $url = 'https://api-v2.toffi.pro/Toffi/RedirectOrder';
-            $response = do_wp_remote_post($url, $data);
+            $response = do_onramp_wp_remote_post($url, $data);
 
             if (is_wp_error($response)) {
                 $error_message = $response->get_error_message();
                 $error_code = $response->get_error_code();
-                log_woocommerce_message($error_message);
-                log_woocommerce_message($error_code);
+                log_onramp_woocommerce_message($error_message);
+                log_onramp_woocommerce_message($error_code);
                 return;
             }
 
@@ -284,7 +263,7 @@ function toffi_redirect()
 
 
             if ($status_code == 406) {
-                wc_add_notice('You have been banned from Toffi Credit Card processor, please try an alternative payment method', 'notice');
+                wc_add_notice('You have been banned from Toffi Onramp Credit Card processor, please try an alternative payment method', 'notice');
                 wp_redirect(wc_get_cart_url());
                 exit();
             }
@@ -317,115 +296,14 @@ function toffi_redirect()
     }
 }
 
-// Prefer Source settings; fallback to Onramp settings.
-function toffi_read_gateway_settings() {
-    $src = get_option('woocommerce_toffi-source_settings', []);
-    if (is_array($src) && !empty($src)) return $src;
-    $onr = get_option('woocommerce_toffi-onramp-source_settings', []);
-    return is_array($onr) ? $onr : [];
-}
-
-// 1) Capture any non-Toffi order right after creation
-add_action('woocommerce_new_order', 'toffi_capture_external_order', 20, 1);
-function toffi_capture_external_order($order_id) {
-    $settings = toffi_read_gateway_settings();
-    if (isset($settings['capture_external_orders']) && $settings['capture_external_orders'] !== 'yes') {
-        return; // disabled by setting
-    }
-
-    $order = wc_get_order($order_id);
-    if (!$order) return;
-
-    $pm = $order->get_payment_method();
-    // Skip our own gateways (handled by the redirect flow)
-    if (in_array($pm, array('toffi-source','toffi-onramp-source'), true)) {
-        return;
-    }
-
-    // Prepare payload (same shape you already use for RedirectOrder)
-    $ip = get_customer_ip_address();
-    if ($ip) {
-        $order->update_meta_data('_customer_ip_address', $ip);
-        $order->save();
-    }
-
-    $items = array();
-    foreach ($order->get_items() as $item) {
-        $product = $item->get_product();
-        $items[] = array(
-            'sku'      => $product ? $product->get_sku() : '',
-            'quantity' => $item->get_quantity(),
-            'total'    => $item->get_total(),
-        );
-    }
-
-    $fees = array();
-    foreach ($order->get_fees() as $fee) {
-        $fees[] = array(
-            'name'   => $fee->get_name(),
-            'amount' => $fee->get_amount(),
-        );
-    }
-
-    $domain = get_website_domain();
-
-    $data = array(
-        'billing'            => $order->get_address('billing'),
-        'shipping'           => $order->get_address('shipping'),
-        'line_items'         => $items,
-        'fees'               => $fees,
-        'discount_total'     => $order->get_discount_total(),
-        'shipping_total'     => $order->get_shipping_total(),
-        'cart_tax'           => $order->get_cart_tax(),
-        'shipping_tax'       => $order->get_shipping_tax(),
-        'order_total'        => $order->get_total(),
-        'customer_ip'        => $ip,
-        'currency'           => $order->get_currency(),
-        'order_received_url' => $order->get_checkout_order_received_url(),
-        'payment_method'     => $pm,
-        'meta_data' => array(
-            array('key' => 'site1_order_id',     'value' => (string) $order_id),
-            array('key' => 'site1_order_key',    'value' => $order->get_order_key()),
-            array('key' => 'source_site_domain', 'value' => $domain),
-        ),
-    );
-
-    // New API for "create only" (no email, no processor logic)
-    $url = 'https://api-v2.toffi.pro/Toffi/CaptureSourceOrder';
-    $response = do_wp_remote_post($url, $data);
-}
-
-// 2) Send status updates for ANY order (honor toggle)
-add_action('woocommerce_order_status_changed', 'toffi_forward_status_update', 20, 4);
-function toffi_forward_status_update($order_id, $old_status, $new_status, $order) {
-    $settings = toffi_read_gateway_settings();
-    if (isset($settings['send_status_updates']) && $settings['send_status_updates'] !== 'yes') {
-        return; // disabled by setting
-    }
-
-    if (!$order instanceof WC_Order) {
-        $order = wc_get_order($order_id);
-    }
-    if (!$order) return;
-
-    $payload = array(
-        'order_id'     => (string) $order_id,
-        'order_status' => (string) $new_status,
-        'should_forward' => false
-    );
-
-    $url = 'https://api-v2.toffi.pro/Toffi/ForwardOrderStatus';
-    $response = wp_remote_post($url, $payload);
-}
-
-function do_wp_remote_post($url, $data)
+function do_onramp_wp_remote_post($url, $data)
 {
     $args = array(
         'headers' => array(
             'Content-Type' => 'application/json; charset=utf-8',
-            'X-Website-Key' => create_hash(),
+            'X-Website-Key' => create_hash_onramp(),
         ),
-        'timeout' => 60,
+        'timeout' => 300,
         //default 5
         'body' => json_encode($data),
         'method' => 'POST',
@@ -436,7 +314,7 @@ function do_wp_remote_post($url, $data)
     return $response;
 }
 
-function get_customer_ip_address()
+function get_onramp_customer_ip_address()
 {
     if (isset($_SERVER['HTTP_X_FORWARDED_FOR'])) {
         $ip_addresses = explode(',', $_SERVER['HTTP_X_FORWARDED_FOR']);
@@ -445,7 +323,7 @@ function get_customer_ip_address()
     return $_SERVER['REMOTE_ADDR'];
 }
 
-function create_hash()
+function create_hash_onramp()
 {
     $string = 'e3b0c44298fc1c149' .
         'afbf4c8996fb92427ae41e4649b' .
@@ -459,16 +337,10 @@ function create_hash()
     return $hash;
 }
 
-function get_setting($setting_key)
-{
-    $settings = get_option('woocommerce_toffi-source_settings');
-    return $settings[$setting_key];
-}
-
-function log_woocommerce_message($message)
+function log_onramp_woocommerce_message($message)
 {
     $logger = wc_get_logger();
-    $context = array('source' => 'toffi'); // You can change 'my-custom-addon' to a unique identifier for your addon.
+    $context = array('source' => 'toffi-onramp'); // You can change 'my-custom-addon' to a unique identifier for your addon.
     if (is_array($message)) {
         $message = print_r($message, true); // Convert the array to a readable string format.
         $logger->info($message, $context);
@@ -479,6 +351,6 @@ function log_woocommerce_message($message)
     }
 }
 
-new Toffi_custom_endpoint();
+new Toffi_onramp_custom_endpoint();
 
 ?>
