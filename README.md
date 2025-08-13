@@ -5,6 +5,10 @@ Stripe
 PayPal
 
 Sumup
+
+Shopify through Desitnation Shopify Store
+
+Toffi Onramp Gateway with various Onramps
 # Setup
 1. Download the contents as .zip
 2. Upload the plugin and install it to your Wordpress Website (You must have Woocommerce plugin enabled on your website)
